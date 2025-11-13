@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Gesture Recognition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            color: #764ba2;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .feature {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature h3 {
+            color: #764ba2;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .code-block code {
+            color: #f8f8f2;
+        }
+        
+        .gesture-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .gesture-list li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .gesture-list li:before {
+            content: "✋";
+            position: absolute;
+            left: 0;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+        }
+        
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .tech-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤚 Hand Gesture Recognition</h1>
+            <p class="subtitle">Real-time hand gesture detection using OpenCV and MediaPipe</p>
+        </header>
+        
+        <div class="content">
+            <h2>📋 About</h2>
+            <p>A simple Python program that recognizes hand gestures in real-time using your webcam. This project uses computer vision techniques to detect and classify different hand gestures.</p>
+            
+            <div class="tech-stack">
+                <span class="tech-badge">Python</span>
+                <span class="tech-badge">OpenCV</span>
+                <span class="tech-badge">MediaPipe</span>
+                <span class="tech-badge">Computer Vision</span>
+            </div>
+        </div>
+        
+        <div class="content">
+            <h2>✨ Features</h2>
+            <div class="features">
+                <div class="feature">
+                    <h3>Real-time Detection</h3>
+                    <p>Detects hand gestures instantly from webcam feed</p>
+                </div>
+                <div class="feature">
+                    <h3>21 Landmarks</h3>
+                    <p>Tracks 21 hand landmark points accurately</p>
+                </div>
+                <div class="feature">
+                    <h3>Multiple Gestures</h3>
+                    <p>Recognizes various hand gestures</p>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: 20px; color: #764ba2;">Recognized Gestures:</h3>
+            <ul class="gesture-list">
+                <li>Fist (0 fingers)</li>
+                <li>One Finger</li>
+                <li>Victory (2 fingers)</li>
+                <li>Open Palm (5 fingers)</li>
+                <li>Thumbs Up</li>
+            </ul>
+        </div>
+        
+        <div class="content">
+            <h2>🚀 Installation</h2>
+            <p><strong>Requirements:</strong> Python 3.7 to 3.12 (MediaPipe doesn't support Python 3.13 yet)</p>
+            
+            <h3>Step 1: Clone the repository</h3>
+            <div class="code-block">
+                <code>git clone https://github.com/sonipriyanshu80/hand_gesture.git<br>cd hand_gesture</code>
+            </div>
+            
+            <h3>Step 2: Install dependencies</h3>
+            <div class="code-block">
+                <code>pip install -r requirements.txt</code>
+            </div>
+        </div>
+        
+        <div class="content">
+            <h2>💻 Usage</h2>
+            <p>Run the program:</p>
+            <div class="code-block">
+                <code>python main.py</code>
+            </div>
+            
+            <ul style="margin-top: 15px; padding-left: 20px;">
+                <li>The webcam window will open</li>
+                <li>Show your hand in front of the camera</li>
+                <li>Hand landmarks will be drawn on the screen</li>
+                <li>Gesture name and finger count will be displayed</li>
+                <li>Press <strong>'q'</strong> key to quit</li>
+            </ul>
+        </div>
+        
+        <div class="content">
+            <h2>📁 Project Structure</h2>
+            <div class="code-block">
+                <code>hand-gesture-recognition/<br>├── README.md<br>├── requirements.txt<br>├── main.py<br>├── .gitignore<br>├── .github/<br>│   └── workflows/<br>│       └── static.yml<br>└── docs/<br>    └── project_description.txt</code>
+            </div>
+        </div>
+        
+        <div class="content" style="text-align: center;">
+            <a href="https://github.com/sonipriyanshu80/hand_gesture" class="btn">View on GitHub</a>
+            <a href="https://github.com/sonipriyanshu80/hand_gesture/archive/refs/heads/main.zip" class="btn">Download ZIP</a>
+        </div>
+        
+        <footer>
+            <p>Student Project - 5th Semester</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">Made with ❤️ using OpenCV and MediaPipe</p>
+        </footer>
+    </div>
+</body>
+</html>
+
