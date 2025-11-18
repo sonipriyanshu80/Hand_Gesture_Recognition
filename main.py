@@ -1,227 +1,129 @@
-import math
-from typing import List, Optional, Tuple
+"""Real-time hand gesture overlay with MediaPipe-style landmark dots."""
+
+from typing import List, Tuple
 
 import cv2
 import numpy as np
+from cvzone.HandTrackingModule import HandDetector
+import time
 
 
-def make_skin_mask(frame: np.ndarray) -> np.ndarray:
-    """Return a smooth skin mask for the current frame."""
-    blur = cv2.GaussianBlur(frame, (5, 5), 0)
-    hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
-    ycrcb = cv2.cvtColor(blur, cv2.COLOR_BGR2YCrCb)
+LANDMARK_CONNECTIONS: List[Tuple[int, int]] = [
+    (0, 1), (1, 2), (2, 3), (3, 4),          # Thumb
+    (0, 5), (5, 6), (6, 7), (7, 8),          # Index
+    (0, 9), (9, 10), (10, 11), (11, 12),     # Middle
+    (0, 13), (13, 14), (14, 15), (15, 16),   # Ring
+    (0, 17), (17, 18), (18, 19), (19, 20)    # Pinky
+]
 
-    low_hsv = np.array([0, 25, 90], dtype=np.uint8)
-    high_hsv = np.array([25, 255, 255], dtype=np.uint8)
-    hsv_mask = cv2.inRange(hsv, low_hsv, high_hsv)
-
-    low_ycrcb = np.array([0, 130, 90], dtype=np.uint8)
-    high_ycrcb = np.array([255, 180, 140], dtype=np.uint8)
-    ycrcb_mask = cv2.inRange(ycrcb, low_ycrcb, high_ycrcb)
-
-    mask = cv2.bitwise_and(hsv_mask, ycrcb_mask)
-
-    kernel = np.ones((5, 5), np.uint8)
-    mask = cv2.erode(mask, kernel, iterations=1)
-    mask = cv2.dilate(mask, kernel, iterations=2)
-    mask = cv2.GaussianBlur(mask, (7, 7), 0)
-    return mask
+TIP_IDS = [4, 8, 12, 16, 20]
 
 
-def pick_hand_contour(mask: np.ndarray) -> Optional[np.ndarray]:
-    """Pick the biggest contour in the mask and treat it as the hand."""
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return None
+def draw_landmarks(frame: np.ndarray, lm_list: List[List[int]]) -> None:
+    """Draw MediaPipe-style skeleton (white lines + red dots)."""
+    for start, end in LANDMARK_CONNECTIONS:
+        x1, y1 = lm_list[start][:2]
+        x2, y2 = lm_list[end][:2]
+        cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
 
-    hand = max(contours, key=cv2.contourArea)
-    if cv2.contourArea(hand) < 9000:
-        return None
-    return hand
-
-
-def keep_spread_out_points(points: List[Tuple[int, int]], min_gap: float = 25.0) -> List[Tuple[int, int]]:
-    """Drop points that sit too close to each other."""
-    filtered: List[Tuple[int, int]] = []
-    for pt in points:
-        if all(math.hypot(pt[0] - other[0], pt[1] - other[1]) > min_gap for other in filtered):
-            filtered.append(pt)
-    return filtered
+    for idx, (x, y, _) in enumerate(lm_list):
+        color = (0, 200, 255) if idx in TIP_IDS else (0, 0, 255)
+        radius = 6 if idx in TIP_IDS else 5
+        cv2.circle(frame, (x, y), radius, color, -1)
+        if idx in TIP_IDS:
+            cv2.putText(frame, str(idx), (x + 8, y - 8), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1)
 
 
-def count_fingers(
-    contour: np.ndarray,
-    frame: np.ndarray
-) -> Tuple[int, List[Tuple[int, int]], List[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]]:
-    """Measure raised fingers from convexity defects."""
-    hull_ids = cv2.convexHull(contour, returnPoints=False)
-    if hull_ids is None or len(hull_ids) < 3:
-        return 0, [], []
+def classify_gesture(fingers_state: List[int]) -> str:
+    """Return a friendly gesture label based on which fingers are raised."""
+    count = sum(fingers_state)
+    thumb, index, middle, ring, pinky = fingers_state
 
-    defects = cv2.convexityDefects(contour, hull_ids)
-    if defects is None:
-        return 0, [], []
-
-    finger_spots: List[Tuple[int, int]] = []
-    finger_links: List[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]] = []
-    count = 0
-
-    for s, e, f, depth in defects[:, 0]:
-        start = tuple(contour[s][0])
-        end = tuple(contour[e][0])
-        dip = tuple(contour[f][0])
-
-        a = math.dist(contour[e][0], contour[f][0])
-        b = math.dist(contour[s][0], contour[f][0])
-        c = math.dist(contour[s][0], contour[e][0])
-        if a == 0 or b == 0:
-            continue
-
-        angle = math.degrees(math.acos(min(1, max(-1, (a * a + b * b - c * c) / (2 * a * b)))))
-
-        if angle <= 95 and depth > 15000:
-            finger_spots.extend([start, end])
-            finger_links.append((start, dip, end))
-            count += 1
-            cv2.circle(frame, dip, 5, (0, 0, 255), -1)
-
-    finger_tips = keep_spread_out_points(finger_spots)
-    finger_tips.sort(key=lambda p: p[1])
-    finger_tips = finger_tips[:5]
-    for tip in finger_tips:
-        cv2.circle(frame, tip, 8, (0, 255, 0), -1)
-
-    if count == 0 and finger_tips:
-        return len(finger_tips), finger_tips, finger_links
-
-    return min(max(len(finger_tips), count + 1), 5), finger_tips, finger_links
-
-
-def label_gesture(
-    finger_count: int,
-    contour: np.ndarray,
-    finger_tips: List[Tuple[int, int]]
-) -> str:
-    """Give a friendly name to the detected hand pose."""
-    if contour is None:
-        return "No Hand Detected"
-
-    if finger_count == 0:
+    if count == 0:
         return "Fist"
-    if finger_count == 1:
-        if thumb_is_up(contour, finger_tips):
-            return "Thumbs Up"
-        return "One Finger"
-    if finger_count == 2:
-        return "Victory"
-    if finger_count == 5:
+    if count == 5:
         return "Open Palm"
-    return f"{finger_count} Fingers"
+    if count == 2 and index and middle and not ring and not pinky:
+        return "Victory"
+    if count == 1 and thumb and not any([index, middle, ring, pinky]):
+        return "Thumbs Up"
+    if count == 1 and index:
+        return "Pointing"
+    return f"{count} Fingers"
 
 
-def thumb_is_up(contour: np.ndarray, finger_tips: List[Tuple[int, int]]) -> bool:
-    """Check if the single raised finger looks like a thumb."""
-    if not finger_tips:
-        return False
+def draw_hud(frame: np.ndarray, gesture: str, finger_count: int) -> None:
+    """Draw translucent info panel with gesture text."""
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (10, 10), (360, 110), (0, 0, 0), -1)
+    frame[:] = cv2.addWeighted(overlay, 0.35, frame, 0.65, 0)
 
-    moments = cv2.moments(contour)
-    if moments["m00"] == 0:
-        return False
-    cx = int(moments["m10"] / moments["m00"])
-    cy = int(moments["m01"] / moments["m00"])
-
-    tip = max(finger_tips, key=lambda p: cy - p[1])
-    dx = tip[0] - cx
-    dy = cy - tip[1]
-
-    rect = cv2.minAreaRect(contour)
-    width, height = rect[1]
-    if width == 0 or height == 0:
-        return False
-
-    ratio = max(width, height) / (min(width, height) + 1e-5)
-
-    pointing_up = dy > abs(dx) * 0.5 and dy > 40
-    sideways = ratio > 1.35
-
-    return pointing_up and sideways
+    cv2.putText(frame, f"Gesture: {gesture}", (28, 54),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.95, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(frame, f"Fingers: {finger_count}", (28, 94),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
 
 
-def draw_hand_edges(frame: np.ndarray, contour: np.ndarray) -> None:
-    hull = cv2.convexHull(contour)
-    cv2.drawContours(frame, [contour], -1, (255, 255, 0), 2)
-    cv2.drawContours(frame, [hull], -1, (0, 255, 255), 2)
-
-
-
+def annotate_tip_coordinates(frame: np.ndarray, lm_list: List[List[int]]) -> None:
+    """Display (x, y) next to each fingertip."""
+    for idx in TIP_IDS:
+        x, y, _ = lm_list[idx]
+        cv2.putText(frame, f"({x}, {y})", (x - 20, y + 25),
+                    cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 0), 1)
 
 
 def main() -> None:
     cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Error: Could not open webcam")
-        return
+    cap.set(3, 1280)
+    cap.set(4, 720)
 
-    print("Hand Gesture Recognition Started!")
-    print("Press 'q' to quit")
+    detector = HandDetector(detectionCon=0.85, maxHands=1)
+    prev_time = time.time()
 
     while True:
-        ok, frame = cap.read()
-        if not ok:
+        success, frame = cap.read()
+        if not success:
             break
-
         frame = cv2.flip(frame, 1)
-        mask = make_skin_mask(frame)
-        hand = pick_hand_contour(mask)
 
-        fingers = 0
-        finger_tips: List[Tuple[int, int]] = []
-        finger_links: List[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]] = []
-        pose = "No Hand Detected"
+        hands, _ = detector.findHands(frame, draw=False)
+        gesture = "No Hand Detected"
+        finger_count = 0
 
-        if hand is not None:
-            draw_hand_edges(frame, hand)
-            fingers, finger_tips, finger_links = count_fingers(hand, frame)
-            pose = label_gesture(fingers, hand, finger_tips)
+        if hands:
+            hand = hands[0]
+            lm_list = hand["lmList"]
+            bbox = hand["bbox"]
+            center = hand["center"]
 
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (320, 90), (0, 0, 0), -1)
-        frame = cv2.addWeighted(overlay, 0.35, frame, 0.65, 0)
+            draw_landmarks(frame, lm_list)
+            annotate_tip_coordinates(frame, lm_list)
+            cv2.rectangle(frame, bbox, (128, 0, 255), 2)
+            cv2.circle(frame, center, 6, (128, 0, 255), -1)
 
-        cv2.putText(
-            frame,
-            f"Gesture: {pose}",
-            (18, 38),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
-        )
+            fingers_state = detector.fingersUp(hand)
+            finger_count = sum(fingers_state)
+            gesture = classify_gesture(fingers_state)
 
-        cv2.putText(
-            frame,
-            f"Fingers: {fingers}",
-            (18, 78),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
-        )
+        draw_hud(frame, gesture, finger_count)
+
+        current_time = time.time()
+        fps = 1 / (current_time - prev_time + 1e-9)
+        prev_time = current_time
+        cv2.putText(frame, f"FPS: {int(fps)}", (1120, 40),
+                    cv2.FONT_HERSHEY_PLAIN, 1.2, (255, 255, 255), 1)
 
         cv2.imshow("Hand Gesture Recognition", frame)
-
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()
     cv2.destroyAllWindows()
-    print("Program ended")
 
 
 if __name__ == "__main__":
     main()
+
 
 
 
